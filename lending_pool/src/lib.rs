@@ -257,6 +257,4 @@ impl LendingPool {
 
         pending
     }
-
-    
 }
