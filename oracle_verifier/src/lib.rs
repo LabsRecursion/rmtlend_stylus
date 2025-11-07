@@ -15,7 +15,6 @@ sol_interface! {
             address user,
             uint256 monthly_amount,
             uint256 reliability_score,
-            uint32 history_months,
             uint256 total_sent
         ) external returns (uint256);
 
@@ -42,11 +41,10 @@ sol_storage! {
         address admin;
         address remittance_nft;
         address loan_manager;
-        address[] oracle_operators;
+        // address[] oracle_operators;
         mapping(address => VerificationRequest) verification_requests;
         mapping(uint256 => bool) monitored_loans;
     }
-
     pub struct VerificationRequest {
         address user;
         string provider;
@@ -72,7 +70,7 @@ impl OracleVerifier {
         &mut self,
         remittance_nft: Address,
         loan_manager: Address,
-        operators: Vec<Address>,
+        // operators: Vec<Address>,
     ) -> Result<(), Vec<u8>> {
         if self.admin.get() != Address::ZERO {
             return Err(b"Already initialized".to_vec());
@@ -82,9 +80,9 @@ impl OracleVerifier {
         self.remittance_nft.set(remittance_nft);
         self.loan_manager.set(loan_manager);
 
-        for op in operators {
-            self.oracle_operators.push(op);
-        }
+        // for op in operators {
+        //     self.oracle_operators.push(op);
+        // }
 
         Ok(())
     }
@@ -108,15 +106,15 @@ impl OracleVerifier {
         &mut self,
         user: Address,
         monthly_amount: U256,
-        history_months: U32,
+        // history_months: U32,
         total_sent: U256,
         paid_count: U32,
         total_count: U32,
     ) -> Result<(), Vec<u8>> {
 
-        if !self._is_operator(self.vm().msg_sender()) {
-            return Err(b"Not authorized".to_vec());
-        }
+        // if !self._is_operator(self.vm().msg_sender()) {
+        //     return Err(b"Not authorized".to_vec());
+        // }
 
         let request = self.verification_requests.get(user);
         if request.status.get() != U8::from(0) {
@@ -134,7 +132,7 @@ impl OracleVerifier {
                 user,
                 monthly_amount,
                 U256::from(reliability_score),
-                history_months.to::<u32>(),
+                // history_months.to::<u32>(),
                 total_sent,
             )?;
         }
@@ -166,14 +164,14 @@ impl OracleVerifier {
 
     pub fn report_remittance(
         &mut self,
-        user: Address,
+        // user: Address,
         nft_id: U256,
         amount: U256,
         loan_id: U256,
     ) -> Result<(), Vec<u8>> {
-        if !self._is_operator(self.vm().msg_sender()) {
-            return Err(b"Not authorized".to_vec());
-        }
+        // if !self._is_operator(self.vm().msg_sender()) {
+        //     return Err(b"Not authorized".to_vec());
+        // }
 
         if !self.monitored_loans.get(loan_id) {
             return Err(b"Loan not monitored".to_vec());
@@ -194,13 +192,13 @@ impl OracleVerifier {
     }
 
     pub fn report_missed_payment(&mut self, loan_id: U256, nft_id: U256) -> Result<(), Vec<u8>> {
-        if !self._is_operator(self.vm().msg_sender()) {
-            return Err(b"Not authorized".to_vec());
-        }
+        // if !self._is_operator(self.vm().msg_sender()) {
+        //     return Err(b"Not authorized".to_vec());
+        // }
 
         {
-            let nft = IRemittanceNFT::new(self.remittance_nft.get());
-            nft.unstake_nft(&mut *self, nft_id)?;
+            // let nft = IRemittanceNFT::new(self.remittance_nft.get());
+            // nft.unstake_nft(&mut *self, nft_id)?;
         }
 
         {
@@ -216,16 +214,14 @@ impl OracleVerifier {
         self.verification_requests.get(user).status.get()
     }
 
-    // --- Internal helpers ---
-
-    fn _is_operator(&self, op: Address) -> bool {
-        for i in 0..self.oracle_operators.len() {
-            if self.oracle_operators.get(i).unwrap() == op {
-                return true;
-            }
-        }
-        false
-    }
+    // fn _is_operator(&self, op: Address) -> bool {
+    //     // for i in 0..self.oracle_operators.len() {
+    //     //     if self.oracle_operators.get(i).unwrap() == op {
+    //     //         return true;
+    //     //     }
+    //     // }
+    //     true
+    // }
 
     fn _calculate_reliability_score(paid: U32, total: U32) -> u32 {
         if total == U32::from(0u64) {
