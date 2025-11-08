@@ -1,0 +1,30 @@
+# --- Rust build artifacts ---
+target/
+**/target/
+
+# --- Stylus / Wasm build outputs ---
+*.wasm
+*.wat
+
+# --- Environment / secrets ---
+.env
+**/.env
+.env.*
+**/.env.*
+
+# --- Cargo / Rust temporary files ---
+**/*.rs.bk
+# Cargo.lock
+# !/**/Cargo.lock  # if you prefer to keep per-crate lockfiles, remove this line
+
+# --- IDE / Editor configs ---
+.vscode/
+.idea/
+.DS_Store
+
+# --- Logs and misc ---
+*.log
+**/*.log
+
+# --- OS-specific ---
+Thumbs.db

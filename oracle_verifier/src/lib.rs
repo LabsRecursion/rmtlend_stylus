@@ -1,13 +1,15 @@
-
 #![cfg_attr(not(any(test, feature = "export-abi")), no_main)]
 #![cfg_attr(not(any(test, feature = "export-abi")), no_std)]
 
 #[macro_use]
 extern crate alloc;
 
-use alloc::{vec::Vec, string::String};
-use alloy_sol_types::{SolEvent, sol};
-use stylus_sdk::{alloy_primitives::{U256, Address, U8, U32, U64}, prelude::*,};
+use alloc::{string::String, vec::Vec};
+use alloy_sol_types::{sol, SolEvent};
+use stylus_sdk::{
+    alloy_primitives::{Address, U256, U32, U64, U8},
+    prelude::*,
+};
 
 sol_interface! {
     interface IRemittanceNFT {
@@ -34,7 +36,6 @@ sol_interface! {
     }
 }
 
-
 sol_storage! {
     #[entrypoint]
     pub struct OracleVerifier {
@@ -54,40 +55,57 @@ sol_storage! {
     }
 }
 
-
 sol! {
     event VerificationRequested(address indexed user);
     event VerificationComplete(address indexed user, uint256 reliability_score);
     event MonitoringStarted(uint256 indexed loan_id);
     event RemittanceReported(uint256 indexed loan_id, uint256 indexed nft_id, uint256 amount);
     event PaymentMissedReported(uint256 indexed loan_id, uint256 indexed nft_id);
+    event Created(address indexed admin);
 }
 
 #[public]
 impl OracleVerifier {
     #[constructor]
-    pub fn initialize(
-        &mut self,
-        remittance_nft: Address,
-        loan_manager: Address,
-        // operators: Vec<Address>,
-    ) -> Result<(), Vec<u8>> {
+    pub fn initialize(&mut self) -> Result<(), Vec<u8>> {
         if self.admin.get() != Address::ZERO {
             return Err(b"Already initialized".to_vec());
         }
 
         self.admin.set(self.vm().msg_sender());
+
+        self.vm().emit_log(
+            &Created {
+                admin: self.vm().msg_sender(),
+            }
+            .encode_data(),
+            1,
+        );
+        Ok(())
+    }
+
+    pub fn set_addresses(
+        &mut self,
+        remittance_nft: Address,
+        loan_manager: Address,
+    ) -> Result<(), Vec<u8>> {
+        if self.admin.get() != self.vm().msg_sender() {
+            return Err(b"Only admin can set addresses".to_vec());
+        }
+
         self.remittance_nft.set(remittance_nft);
         self.loan_manager.set(loan_manager);
 
-        // for op in operators {
-        //     self.oracle_operators.push(op);
-        // }
+        // self.vm().emit_log(&Created { admin: self.vm().msg_sender() }.encode_data(), 1);
 
         Ok(())
     }
 
-    pub fn request_verification(&mut self, provider: String, account_id: String) -> Result<(), Vec<u8>> {
+    pub fn request_verification(
+        &mut self,
+        provider: String,
+        account_id: String,
+    ) -> Result<(), Vec<u8>> {
         let user = self.vm().msg_sender();
         let timestamp = U64::from(self.vm().block_timestamp());
 
@@ -98,7 +116,8 @@ impl OracleVerifier {
         request.request_timestamp.set(timestamp);
         request.status.set(U8::from(0)); // Pending
 
-        self.vm().emit_log(&VerificationRequested { user }.encode_data(), 2);
+        self.vm()
+            .emit_log(&VerificationRequested { user }.encode_data(), 2);
         Ok(())
     }
 
@@ -111,7 +130,6 @@ impl OracleVerifier {
         paid_count: U32,
         total_count: U32,
     ) -> Result<(), Vec<u8>> {
-
         // if !self._is_operator(self.vm().msg_sender()) {
         //     return Err(b"Not authorized".to_vec());
         // }
@@ -143,11 +161,13 @@ impl OracleVerifier {
         }
 
         self.vm().emit_log(
-            &VerificationComplete { 
-                user, 
-                reliability_score: U256::from(reliability_score) 
+            &VerificationComplete {
+                user,
+                reliability_score: U256::from(reliability_score),
             }
-            .encode_data(), 2);
+            .encode_data(),
+            2,
+        );
 
         Ok(())
     }
@@ -158,7 +178,8 @@ impl OracleVerifier {
         }
 
         self.monitored_loans.insert(loan_id, true);
-        self.vm().emit_log(&MonitoringStarted { loan_id }.encode_data(), 2);
+        self.vm()
+            .emit_log(&MonitoringStarted { loan_id }.encode_data(), 2);
         Ok(())
     }
 
@@ -187,7 +208,15 @@ impl OracleVerifier {
             loan_mgr.process_auto_repayment(&mut *self, loan_id, amount)?;
         }
 
-        self.vm().emit_log(&RemittanceReported { loan_id, nft_id, amount }.encode_data(), 3);
+        self.vm().emit_log(
+            &RemittanceReported {
+                loan_id,
+                nft_id,
+                amount,
+            }
+            .encode_data(),
+            3,
+        );
         Ok(())
     }
 
@@ -206,7 +235,8 @@ impl OracleVerifier {
             loan_mgr.mark_payment_missed(&mut *self, loan_id)?;
         }
 
-        self.vm().emit_log(&PaymentMissedReported { loan_id, nft_id }.encode_data(), 2);
+        self.vm()
+            .emit_log(&PaymentMissedReported { loan_id, nft_id }.encode_data(), 2);
         Ok(())
     }
 

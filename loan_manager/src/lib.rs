@@ -1,4 +1,3 @@
-
 #![cfg_attr(not(any(test, feature = "export-abi")), no_main)]
 #![cfg_attr(not(any(test, feature = "export-abi")), no_std)]
 
@@ -7,8 +6,12 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 
-use alloy_sol_types::{SolEvent, sol};
-use stylus_sdk::{alloy_primitives::{U256, Address, U8, U32, U64}, prelude::*, storage::{StorageVec, StorageU256}};
+use alloy_sol_types::{sol, SolEvent};
+use stylus_sdk::{
+    alloy_primitives::{Address, U256, U32, U64, U8},
+    prelude::*,
+    storage::{StorageU256, StorageVec},
+};
 
 sol_storage! {
     #[entrypoint]
@@ -70,24 +73,29 @@ sol! {
 
 #[public]
 impl LoanManager {
-
     #[constructor]
-    pub fn initialize(
-        &mut self,
-        remittance_nft: Address,
-        lending_pool: Address,
-        oracle: Address,
-        usdc: Address,
-    ) -> Result<(), Vec<u8>> {
+    pub fn initialize(&mut self, usdc: Address) -> Result<(), Vec<u8>> {
         if self.admin.get() != Address::ZERO {
             return Err(b"Already initialized".to_vec());
         }
         self.admin.set(self.vm().msg_sender());
+        self.usdc.set(usdc);
+        self.loan_counter.set(U256::ZERO);
+        Ok(())
+    }
+
+    pub fn setup_addresses(
+        &mut self,
+        remittance_nft: Address,
+        lending_pool: Address,
+        oracle: Address,
+    ) -> Result<(), Vec<u8>> {
+        if self.admin.get() != self.vm().msg_sender() {
+            return Err(b"Only admin".to_vec());
+        }
         self.remittance_nft.set(remittance_nft);
         self.lending_pool.set(lending_pool);
         self.oracle.set(oracle);
-        self.usdc.set(usdc);
-        self.loan_counter.set(U256::ZERO);
         Ok(())
     }
 
@@ -100,9 +108,10 @@ impl LoanManager {
         let borrower = self.vm().msg_sender();
 
         // let (owner, _, reliability_score, _, _) = IRemittanceNFT::new(self.remittance_nft.get())
-            // .getRemittance(nft_id);
+        // .getRemittance(nft_id);
         let remittance_nft = IRemittanceNFT::new(self.remittance_nft.get());
-        let (owner, _, reliability_score, _, _) = remittance_nft.get_remittance(&mut *self, nft_id)?;
+        let (owner, _, reliability_score, _, _) =
+            remittance_nft.get_remittance(&mut *self, nft_id)?;
 
         if owner != borrower {
             return Err(b"NFT does not belong to borrower".to_vec());
@@ -112,7 +121,11 @@ impl LoanManager {
         let monthly_payment =
             Self::_calculate_monthly_payment(amount, interest_rate_bps, duration_months);
         let current_time = U64::from(self.vm().block_timestamp());
-        let next_pay_date = U64::from(self.vm().block_timestamp().saturating_add( 30 * 24 * 60 * 60));
+        let next_pay_date = U64::from(
+            self.vm()
+                .block_timestamp()
+                .saturating_add(30 * 24 * 60 * 60),
+        );
 
         let loan_id = self.loan_counter.get() + U256::from(1u64);
         self.loan_counter.set(loan_id);
@@ -133,7 +146,6 @@ impl LoanManager {
         loan.payments_made.set(U32::from(0));
         loan.payments_missed.set(U32::from(0));
 
-
         // self.loans.insert(loan_id, loan);
 
         // let mut list = self.borrower_loans.get(borrower);
@@ -151,7 +163,7 @@ impl LoanManager {
         }
 
         let loan = self.loans.getter(loan_id);
-        let  loan_amount = loan.loan_amount.get();
+        let loan_amount = loan.loan_amount.get();
         let borrower = loan.borrower.get();
         let nft_id = loan.nft_collateral_id.get();
         if loan.status.get() != U8::from(0) {
@@ -160,19 +172,14 @@ impl LoanManager {
 
         {
             let _ = IRemittanceNFT::new(self.remittance_nft.get())
-                .stake_nft(
-                    &mut *self, 
-                    nft_id, 
-                    loan_id
-                )?;
+                .stake_nft(&mut *self, nft_id, loan_id)?;
 
-            let _ = ILendingPool::new(self.lending_pool.get())
-                .borrow(
-                    &mut *self, 
-                    loan_amount,
-                    borrower,
-                    loan_id,    
-                )?;
+            let _ = ILendingPool::new(self.lending_pool.get()).borrow(
+                &mut *self,
+                loan_amount,
+                borrower,
+                loan_id,
+            )?;
         }
 
         {
@@ -282,24 +289,21 @@ impl LoanManager {
 
             let nft: IRemittanceNFT = IRemittanceNFT::new(remittance_nft_addr);
             let _ = nft.unstake_nft(&mut *self, nft_id)?;
+        } else {
         }
-        else {}
 
         {
             let mut loan = self.loans.setter(loan_id);
-            loan.total_repaid
-                .set(total_repaid);
-            loan.payments_made
-                .set(payments_made);
-            loan.next_payment_due
-                .set(next_payment_due);
+            loan.total_repaid.set(total_repaid);
+            loan.payments_made.set(payments_made);
+            loan.next_payment_due.set(next_payment_due);
 
             if principal_portion >= outstanding {
                 loan.outstanding_balance.set(U256::ZERO);
                 loan.status.set(U8::from(2)); // 2 = Fully repaid or closed
-            }
-            else {
-                loan.outstanding_balance.set(outstanding - principal_portion);
+            } else {
+                loan.outstanding_balance
+                    .set(outstanding - principal_portion);
             }
         }
 
@@ -324,8 +328,8 @@ impl LoanManager {
     }
 
     fn _calculate_monthly_payment(principal: U256, rate_bps: u32, months: u32) -> U256 {
-        let total_interest = principal * U256::from(rate_bps) * U256::from(months)
-            / U256::from(12u64 * 10000u64);
+        let total_interest =
+            principal * U256::from(rate_bps) * U256::from(months) / U256::from(12u64 * 10000u64);
         let total = principal + total_interest;
         if months == 0 {
             total
