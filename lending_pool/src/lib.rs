@@ -7,7 +7,12 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 
-use stylus_sdk::{alloy_primitives::{U256, Address, U32, U64}, prelude::*};
+use stylus_sdk::{
+    alloy_primitives::{
+        U256, Address, 
+        U32, U64
+    }, prelude::*
+};
 
 sol_interface! {
     interface IERC20 {

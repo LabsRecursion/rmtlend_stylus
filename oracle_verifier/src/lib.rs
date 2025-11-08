@@ -69,18 +69,17 @@ impl OracleVerifier {
     #[constructor]
     pub fn initialize(&mut self) -> Result<(), Vec<u8>> {
         if self.admin.get() != Address::ZERO {
-            return Err(b"Already initialized".to_vec());
+            return Err(b"".to_vec());
         }
-
         self.admin.set(self.vm().msg_sender());
 
-        self.vm().emit_log(
-            &Created {
-                admin: self.vm().msg_sender(),
-            }
-            .encode_data(),
-            1,
-        );
+        // self.vm().emit_log(
+        //     &Created {
+        //         admin: self.vm().msg_sender(),
+        //     }
+        //     .encode_data(),
+        //     1,
+        // );
         Ok(())
     }
 
@@ -89,15 +88,12 @@ impl OracleVerifier {
         remittance_nft: Address,
         loan_manager: Address,
     ) -> Result<(), Vec<u8>> {
-        if self.admin.get() != self.vm().msg_sender() {
-            return Err(b"Only admin can set addresses".to_vec());
-        }
+        // if self.admin.get() != self.vm().msg_sender() {
+        //     return Err(b"Only admin can set addresses".to_vec());
+        // }
 
         self.remittance_nft.set(remittance_nft);
         self.loan_manager.set(loan_manager);
-
-        // self.vm().emit_log(&Created { admin: self.vm().msg_sender() }.encode_data(), 1);
-
         Ok(())
     }
 
@@ -115,25 +111,25 @@ impl OracleVerifier {
         request.account_id.set_str(account_id);
         request.request_timestamp.set(timestamp);
         request.status.set(U8::from(0)); // Pending
-
         self.vm()
             .emit_log(&VerificationRequested { user }.encode_data(), 2);
         Ok(())
     }
 
+    // loan_manager = 0xe469618196246754a97483763ff85707f3996049
+    // oracle_verifier = 0x9859550f08e4686beebb6ffc9602d0e417cc6861
+    // token = 0x1465423f3a045bd18b0cf6068dec0cb07bfd360d
+    // lending_pool = 0x83b249734809f1e1a687e502441439d1e6119552
+    // remittance = 0xb0a7a7c599c08fa374b8cd24041d5e2b0960aacb
+
     pub fn submit_verification(
         &mut self,
         user: Address,
         monthly_amount: U256,
-        // history_months: U32,
         total_sent: U256,
         paid_count: U32,
         total_count: U32,
     ) -> Result<(), Vec<u8>> {
-        // if !self._is_operator(self.vm().msg_sender()) {
-        //     return Err(b"Not authorized".to_vec());
-        // }
-
         let request = self.verification_requests.get(user);
         if request.status.get() != U8::from(0) {
             return Err(b"Already processed".to_vec());
@@ -190,10 +186,6 @@ impl OracleVerifier {
         amount: U256,
         loan_id: U256,
     ) -> Result<(), Vec<u8>> {
-        // if !self._is_operator(self.vm().msg_sender()) {
-        //     return Err(b"Not authorized".to_vec());
-        // }
-
         if !self.monitored_loans.get(loan_id) {
             return Err(b"Loan not monitored".to_vec());
         }
@@ -221,9 +213,6 @@ impl OracleVerifier {
     }
 
     pub fn report_missed_payment(&mut self, loan_id: U256, nft_id: U256) -> Result<(), Vec<u8>> {
-        // if !self._is_operator(self.vm().msg_sender()) {
-        //     return Err(b"Not authorized".to_vec());
-        // }
 
         {
             // let nft = IRemittanceNFT::new(self.remittance_nft.get());
@@ -243,15 +232,6 @@ impl OracleVerifier {
     pub fn get_verification_status(&self, user: Address) -> U8 {
         self.verification_requests.get(user).status.get()
     }
-
-    // fn _is_operator(&self, op: Address) -> bool {
-    //     // for i in 0..self.oracle_operators.len() {
-    //     //     if self.oracle_operators.get(i).unwrap() == op {
-    //     //         return true;
-    //     //     }
-    //     // }
-    //     true
-    // }
 
     fn _calculate_reliability_score(paid: U32, total: U32) -> u32 {
         if total == U32::from(0u64) {

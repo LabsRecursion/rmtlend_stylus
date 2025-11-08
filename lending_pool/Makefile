@@ -14,7 +14,7 @@ check:
 
 deploy_testnet:
 	@echo "deploying locally!"
-	@cargo stylus deploy -e $(RPC_TESTNET) --no-verify --private-key $(PRIVATE_KEY_TEST)
+	@cargo stylus deploy -e $(RPC_TESTNET) --no-verify --private-key $(PRIVATE_KEY_TEST) --constructor-args 0xe469618196246754a97483763ff85707f3996049 0x1465423f3a045bd18b0cf6068dec0cb07bfd360d 30
 
 verify_testnet:
 	@echo "verifying the contract"

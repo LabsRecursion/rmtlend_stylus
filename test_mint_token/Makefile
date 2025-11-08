@@ -13,7 +13,7 @@ check:
 	@cargo stylus check
 
 deploy_testnet:
-	@echo "deploying locally!"
+	@echo "deploying testnet!"
 	@cargo stylus deploy -e $(RPC_TESTNET) --no-verify --private-key $(PRIVATE_KEY_TEST)
 
 verify_testnet:
